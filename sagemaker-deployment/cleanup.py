@@ -8,6 +8,7 @@ import json
 import sys
 import time
 from datetime import datetime
+from botocore.exceptions import ClientError
 from config import AWS_REGION, ENDPOINT_NAME
 
 
@@ -63,12 +64,14 @@ def delete_endpoint(sm_client, endpoint_name):
                 elapsed = int(time.time() - start_time)
                 print(f"  Still deleting... ({elapsed}s elapsed)", end='\r')
                 time.sleep(10)
-            except sm_client.exceptions.EndpointNotFound:
-                print(f"\n✓ Endpoint deleted: {endpoint_name}")
-                break
-            except Exception as e:
-                print(f"\n✗ Error checking endpoint status: {str(e)}")
-                break
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code == 'ValidationException' and 'Could not find endpoint' in str(e):
+                    print(f"\n✓ Endpoint deleted: {endpoint_name}")
+                    break
+                else:
+                    print(f"\n✗ Error checking endpoint status: {str(e)}")
+                    break
                 
             if time.time() - start_time > 600:  # 10 minute timeout
                 print(f"\n⚠ Timeout waiting for endpoint deletion")
@@ -76,11 +79,16 @@ def delete_endpoint(sm_client, endpoint_name):
                 
         return True
         
-    except sm_client.exceptions.EndpointNotFound:
-        print(f"  Endpoint not found: {endpoint_name}")
-        return False
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', '')
+        if error_code == 'ValidationException' and 'Could not find endpoint' in str(e):
+            print(f"  ℹ️  Endpoint doesn't exist (already deleted): {endpoint_name}")
+            return True
+        else:
+            print(f"✗ Error deleting endpoint: {str(e)}")
+            return False
     except Exception as e:
-        print(f"✗ Error deleting endpoint: {str(e)}")
+        print(f"✗ Unexpected error: {str(e)}")
         return False
 
 
@@ -92,11 +100,16 @@ def delete_endpoint_config(sm_client, config_name):
         sm_client.delete_endpoint_config(EndpointConfigName=config_name)
         print(f"✓ Endpoint configuration deleted: {config_name}")
         return True
-    except sm_client.exceptions.EndpointConfigNotFound:
-        print(f"  Endpoint configuration not found: {config_name}")
-        return False
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', '')
+        if error_code == 'ValidationException' and 'Could not find endpoint configuration' in str(e):
+            print(f"  ℹ️  Endpoint configuration doesn't exist (already deleted): {config_name}")
+            return True
+        else:
+            print(f"✗ Error deleting endpoint configuration: {str(e)}")
+            return False
     except Exception as e:
-        print(f"✗ Error deleting endpoint configuration: {str(e)}")
+        print(f"✗ Unexpected error: {str(e)}")
         return False
 
 
@@ -108,11 +121,16 @@ def delete_model(sm_client, model_name):
         sm_client.delete_model(ModelName=model_name)
         print(f"✓ Model deleted: {model_name}")
         return True
-    except sm_client.exceptions.ModelNotFound:
-        print(f"  Model not found: {model_name}")
-        return False
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', '')
+        if error_code == 'ValidationException' and 'Could not find model' in str(e):
+            print(f"  ℹ️  Model doesn't exist (already deleted): {model_name}")
+            return True
+        else:
+            print(f"✗ Error deleting model: {str(e)}")
+            return False
     except Exception as e:
-        print(f"✗ Error deleting model: {str(e)}")
+        print(f"✗ Unexpected error: {str(e)}")
         return False
 
 
