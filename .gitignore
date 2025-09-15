@@ -24,6 +24,7 @@ wheels/
 venv/
 env/
 ENV/
+**/.venv
 
 # IDE
 .vscode/
@@ -46,3 +47,9 @@ Thumbs.db
 .aws/
 credentials
 **/*deployment_info.json
+spec/
+
+# Torchserve
+**/models
+**/model-store
+**/model.tar*

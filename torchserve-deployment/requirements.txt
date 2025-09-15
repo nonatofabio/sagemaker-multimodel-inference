@@ -1,0 +1,6 @@
+torch>=1.13.0
+transformers>=4.21.0
+torchserve>=0.7.0
+torch-model-archiver>=0.7.0
+numpy
+tokenizers
