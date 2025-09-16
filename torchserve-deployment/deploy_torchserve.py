@@ -12,14 +12,48 @@ import json
 import time
 from model_config import SAGEMAKER_CONFIG, TORCHSERVE_CONFIG
 
+def cleanup_existing_endpoint(endpoint_name):
+    """Clean up existing endpoint and endpoint configuration if they exist."""
+    sagemaker_client = boto3.client('sagemaker')
+    
+    try:
+        # Check if endpoint exists
+        sagemaker_client.describe_endpoint(EndpointName=endpoint_name)
+        print(f"🧹 Deleting existing endpoint: {endpoint_name}")
+        sagemaker_client.delete_endpoint(EndpointName=endpoint_name)
+        
+        # Wait for endpoint deletion
+        waiter = sagemaker_client.get_waiter('endpoint_deleted')
+        waiter.wait(EndpointName=endpoint_name)
+        print(f"✅ Endpoint {endpoint_name} deleted")
+    except sagemaker_client.exceptions.ClientError as e:
+        if "does not exist" in str(e):
+            print(f"ℹ️ Endpoint {endpoint_name} does not exist")
+        else:
+            print(f"⚠️ Error checking endpoint: {e}")
+    
+    try:
+        # Check if endpoint configuration exists
+        sagemaker_client.describe_endpoint_config(EndpointConfigName=endpoint_name)
+        print(f"🧹 Deleting existing endpoint configuration: {endpoint_name}")
+        sagemaker_client.delete_endpoint_config(EndpointConfigName=endpoint_name)
+        print(f"✅ Endpoint configuration {endpoint_name} deleted")
+    except sagemaker_client.exceptions.ClientError as e:
+        if "does not exist" in str(e):
+            print(f"ℹ️ Endpoint configuration {endpoint_name} does not exist")
+        else:
+            print(f"⚠️ Error checking endpoint configuration: {e}")
+
 def upload_model_to_s3(mar_file_path, bucket_name, key_prefix="torchserve-models"):
-    """Upload model archive to S3."""
+    """Upload model archive and requirements to S3."""
     s3 = boto3.client('s3')
     
-    # Create tar.gz file containing the .mar file
+    # Create tar.gz file containing the .mar file, handler.py, and requirements.txt
     tar_path = "model.tar.gz"
     with tarfile.open(tar_path, "w:gz") as tar:
         tar.add(mar_file_path, arcname=os.path.basename(mar_file_path))
+        tar.add("handler.py", arcname="handler.py")
+        tar.add("requirements.txt", arcname="requirements.txt")
     
     # Upload to S3
     key = f"{key_prefix}/{os.path.basename(tar_path)}"
@@ -33,9 +67,14 @@ def upload_model_to_s3(mar_file_path, bucket_name, key_prefix="torchserve-models
     
     return model_data_url
 
-def deploy_model(model_data_url, endpoint_name="torchserve-security-models"):
+def deploy_model(model_data_url, endpoint_name=None):
     """Deploy TorchServe model to SageMaker."""
     session = sagemaker.Session()
+    
+    # Generate unique endpoint name if not provided
+    if endpoint_name is None:
+        timestamp = int(time.time())
+        endpoint_name = f"torchserve-security-models-{timestamp}"
     
     # Create dedicated SageMaker role
     iam = boto3.client('iam')
@@ -78,7 +117,9 @@ def deploy_model(model_data_url, endpoint_name="torchserve-security-models"):
         framework_version=SAGEMAKER_CONFIG["framework_version"],
         py_version=SAGEMAKER_CONFIG["py_version"],
         entry_point="handler.py",
-        name=f"torchserve-model-{int(time.time())}"
+        source_dir=".",
+        name=f"torchserve-model-{int(time.time())}",
+        dependencies=["requirements.txt"],
     )
     print(f"✅ PyTorch model created")
     # Deploy to endpoint

@@ -19,7 +19,7 @@ TORCHSERVE_CONFIG = {
     "model_name": "multi-security-model",
     "handler": "handler.py",
     "runtime": "python",
-    "batch_size": 8,
+    "batch_size": 16,
     "max_batch_delay": 100,
     "response_timeout": 120,
     "initial_workers": 1,
@@ -31,6 +31,6 @@ SAGEMAKER_CONFIG = {
     "instance_type": "ml.g5.xlarge",
     "initial_instance_count": 1,
     "model_data_url": None,  # Will be set during deployment
-    "framework_version": "1.13.1",
-    "py_version": "py39"
+    "framework_version": "2.6.0",
+    "py_version": "py312"
 }
